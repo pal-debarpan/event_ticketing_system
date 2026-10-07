@@ -14,6 +14,7 @@ const registerForEvent = async (req, res) => {
     }
 
     const client = await pool.connect();
+    let transactionCommitted = false;
 
     try {
         await client.query("BEGIN");
@@ -97,29 +98,48 @@ const registerForEvent = async (req, res) => {
         );
 
         const ticket = ticketResult.rows[0];
-        const qrCode = await QRCode.toDataURL(ticketToken);
-
-        await client.query("COMMIT");
-
-        await sendTicketEmail({
-            email,
-            name,
-            event,
-            qrCode
+        const qrCode = await QRCode.toDataURL(ticketToken, {
+            width: 400,
+            margin: 4,
+            errorCorrectionLevel: "M"
         });
 
-        res.status(201).json({
-            message: "Registration successful",
+        await client.query("COMMIT");
+        transactionCommitted = true;
+
+        let emailSent = true;
+
+        try {
+            await sendTicketEmail({
+                email,
+                name,
+                event,
+                qrCode
+            });
+        } catch (emailError) {
+            emailSent = false;
+            console.error("Ticket email failed:", emailError);
+        }
+
+        return res.status(201).json({
+            message: emailSent
+                ? "Registration successful"
+                : "Registration successful, but the confirmation email could not be sent.",
+            emailSent,
             registration,
             ticket: {
-                id: ticket.id,
-                token: ticketToken,
-                qrCode
+                id: ticket.id
             }
         });
 
     } catch (error) {
-        await client.query("ROLLBACK");
+        if (!transactionCommitted) {
+            try {
+                await client.query("ROLLBACK");
+            } catch (rollbackError) {
+                console.error("Rollback failed:", rollbackError);
+            }
+        }
 
         if (error.code === "23505") {
             return res.status(409).json({
@@ -129,7 +149,7 @@ const registerForEvent = async (req, res) => {
 
         console.error("Error registering for event:", error);
 
-        res.status(500).json({
+        return res.status(500).json({
             error: "Registration failed"
         });
 

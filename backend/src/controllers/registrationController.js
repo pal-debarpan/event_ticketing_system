@@ -114,7 +114,8 @@ const registerForEvent = async (req, res) => {
                 email,
                 name,
                 event,
-                qrCode
+                qrCode,
+                ticketId: ticket.id
             });
         } catch (emailError) {
             emailSent = false;

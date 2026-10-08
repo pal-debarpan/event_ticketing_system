@@ -4,12 +4,13 @@ const {
     createEvent,
     getEventById
 } = require("../controllers/eventController");
+const organizerAuth = require("../middleware/organizerAuth");
 
 const router = express.Router();
 
 router.get("/", getEvents);
 
-router.post("/", createEvent);
+router.post("/", organizerAuth, createEvent);
 
 router.get("/:id", getEventById);
 

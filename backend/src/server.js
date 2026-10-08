@@ -29,7 +29,14 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(process.env.PORT || 3000, () => {
-    console.log(`Server running on port ${process.env.PORT || 3000}`);
-});
+// Vercel invokes the exported Express application as a serverless function.
+// Keep the listener for the existing local development workflow.
+if (require.main === module) {
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+    });
+}
+
+module.exports = app;
 
